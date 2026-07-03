@@ -389,7 +389,7 @@ def _ping_ollama() -> bool:
         return False
 
 
-def _call_solly_backend(prompt: str, timeout: float = 15.0) -> str | None:
+def _call_solly_backend(prompt: str, timeout: float = 25.0) -> str | None:
     """Call the Solly Cricket FastAPI backend (deployed on Render).
 
     The backend holds the OpenRouter API key server-side, so the desktop
@@ -433,7 +433,7 @@ _PROVIDER_CALLS = {
 }
 
 
-def _query_llm(prompt: str, timeout: float = 10.0) -> str | None:
+def _query_llm(prompt: str, timeout: float = 25.0) -> str | None:
     """Send prompt to the active provider and return the response text."""
     provider = _get_active_provider()
     if not provider:

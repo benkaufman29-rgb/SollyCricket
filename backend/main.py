@@ -12,6 +12,7 @@ import logging
 import os
 import random
 import re
+import time
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -188,8 +189,17 @@ def _is_valid_commentary(text: str) -> bool:
     return True
 
 
-def call_openrouter(prompt: str, timeout: float = 10.0) -> str | None:
-    """Call OpenRouter API, trying models in order until one succeeds."""
+def call_openrouter(prompt: str, timeout: float = 15.0) -> str | None:
+    """Call OpenRouter API with retry and exponential backoff on rate limits.
+
+    When a 429 (Too Many Requests) is hit:
+      - Wait 1s, retry same model
+      - Then 2s, retry same model
+      - Then 4s, retry same model
+      - Then move to next model in the whitelist
+
+    Respects OpenRouter's Retry-After header if present.
+    """
     api_key = os.environ.get("OPENROUTER_API_KEY")
     if not api_key:
         logger.error("OPENROUTER_API_KEY not set")
@@ -208,17 +218,40 @@ def call_openrouter(prompt: str, timeout: float = 10.0) -> str | None:
             "temperature": 0.8,
             "max_tokens": 500,
         }
-        try:
-            resp = requests.post(OPENROUTER_URL, json=payload, headers=headers, timeout=timeout)
-            resp.raise_for_status()
-            data = resp.json()
-            choice = data["choices"][0]["message"]
-            text = choice.get("content") or choice.get("reasoning") or ""
-            if text.strip():
-                return text.strip()[:150]
-        except requests.RequestException as e:
-            logger.warning(f"Model {model} failed: {e}")
-            continue
+
+        # Retry with exponential backoff for this model
+        backoff = 1.0
+        for attempt in range(4):  # 3 retries + 1 initial
+            try:
+                resp = requests.post(
+                    OPENROUTER_URL, json=payload, headers=headers, timeout=timeout
+                )
+                if resp.status_code == 429:
+                    # Respect Retry-After header, or use exponential backoff
+                    retry_after = resp.headers.get("Retry-After")
+                    wait = float(retry_after) if retry_after else backoff
+                    logger.info(
+                        f"429 rate limited on {model}, retrying in {wait:.0f}s "
+                        f"(attempt {attempt + 1}/4)"
+                    )
+                    time.sleep(wait)
+                    backoff = min(backoff * 2, 8.0)  # Cap at 8s
+                    continue
+
+                resp.raise_for_status()
+                data = resp.json()
+                choice = data["choices"][0]["message"]
+                text = choice.get("content") or choice.get("reasoning") or ""
+                if text.strip():
+                    return text.strip()[:150]
+                break  # Empty response isn't a retry-able error
+            except requests.RequestException as e:
+                if attempt < 3:
+                    logger.info(f"{model} attempt {attempt + 1} failed: {e}, retrying...")
+                    time.sleep(backoff)
+                    backoff = min(backoff * 2, 8.0)
+                else:
+                    logger.warning(f"Model {model} failed after 4 attempts: {e}")
 
     logger.error("All OpenRouter models failed")
     return None
