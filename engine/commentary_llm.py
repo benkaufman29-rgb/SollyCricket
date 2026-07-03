@@ -64,12 +64,15 @@ def _get_key(name: str) -> str | None:
 # Provider configs
 # ---------------------------------------------------------------------------
 
+# Default Render backend URL — override via SOLLY_BACKEND_URL env var
+_DEFAULT_BACKEND_URL = "https://solly-cricket-api.onrender.com"
+
 PROVIDERS = {
     "solly_backend": {
         "env_key": "SOLLY_BACKEND_URL",
-        "url": None,  # Dynamically resolved from env var
+        "url": _DEFAULT_BACKEND_URL,
         "free_tier": True,
-        "needs_key": True,
+        "needs_key": False,  # Always available — uses hardcoded default URL
     },
     "openrouter": {
         "env_key": "OPENROUTER_API_KEY",
@@ -393,13 +396,17 @@ def _call_solly_backend(prompt: str, timeout: float = 15.0) -> str | None:
     app never touches the key. The prompt is built client-side and sent
     as a string.
 
+    Uses the Render URL from env var SOLLY_BACKEND_URL, falling back to
+    the hardcoded default URL if not set.
+
     Falls back gracefully: returns None on any error, so the caller falls
     through to template or the next available provider.
     """
     import requests
-    backend_url = os.environ.get("SOLLY_BACKEND_URL", "").rstrip("/")
-    if not backend_url:
-        return None
+    backend_url = (
+        os.environ.get("SOLLY_BACKEND_URL", "").rstrip("/")
+        or _DEFAULT_BACKEND_URL
+    )
 
     url = f"{backend_url}/commentary"
     payload = {"prompt": prompt}

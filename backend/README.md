@@ -24,7 +24,7 @@ GitHub repository.
    | **Branch** | `main` (or your branch) |
    | **Runtime** | `Python 3` |
    | **Build Command** | `pip install -r backend/requirements.txt` |
-   | **Start Command** | `uvicorn backend.main:app --host 0.0.0.0 --port $PORT` |
+   | **Start Command** | `python -m uvicorn backend.main:app --host 0.0.0.0 --port $PORT` |
    | **Plan** | **Free** |
 
 5. Under **Environment Variables**, add:
