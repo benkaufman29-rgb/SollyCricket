@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solly Cricket</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Start Screen Overlay -->
+    <div class="start-overlay" id="start-overlay">
+        <div class="start-content">
+            <img id="start-logo" class="start-logo" alt="Solly Cricket" src="">
+            <h1 class="start-title">SOLLY CRICKET</h1>
+            <p class="start-subtitle">Australia vs England T20I</p>
+
+            <button class="start-btn" id="btn-start" onclick="startMatch()">Start Match</button>
+            <div class="start-instructions">
+                <p>Hit <strong>Bowl Ball</strong> to deliver each ball, or <strong>Autoplay</strong> for rapid mode.</p>
+                <p>Switch innings after the first team bats, then chase the target!</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="app-container">
+        <!-- Match Summary Banner Header -->
+        <header class="match-header" id="match-header">
+            <div class="series-name">AUSTRALIA VS ENGLAND T20I</div>
+            <div class="match-details">
+                <div class="team-score-block">
+                    <span class="team-name" id="header-batting-team">Loading...</span>
+                    <span class="score" id="header-score">0/0</span>
+                    <span class="overs" id="header-overs">(0.0 Ov)</span>
+                </div>
+                <div class="match-meta">
+                    <span class="run-rate" id="header-crr">CRR: 0.00</span>
+                    <span class="target-info" id="header-target" style="display: none;">Target: -</span>
+                </div>
+            </div>
+            <div class="status-banner" id="header-status">Initializing match...</div>
+        </header>
+
+        <!-- Main Content: Left half scorecards, Right half commentary -->
+        <main class="main-content">
+            <div class="summary-panel">
+                <!-- Left half: Scorecards (batting, bowling, FOW) -->
+                <div class="scorecards-half">
+                    <!-- Batting Card -->
+                    <div class="card batting-card">
+                        <h3 class="card-title" id="batting-team-title">Batting</h3>
+                        <table class="cric-table" id="batting-table">
+                            <thead>
+                                <tr>
+                                    <th>Batsman</th>
+                                    <th>Dismissal</th>
+                                    <th class="num-col">R</th>
+                                    <th class="num-col">B</th>
+                                    <th class="num-col">4s</th>
+                                    <th class="num-col">6s</th>
+                                    <th class="num-col">SR</th>
+                                </tr>
+                            </thead>
+                            <tbody id="batting-tbody">
+                                <!-- Dynamically filled -->
+                            </tbody>
+                        </table>
+                        <div class="extras-row" id="extras-container">
+                            <strong>Extras:</strong> <span id="extras-details">(w 0, nb 0, b 0, lb 0)</span> <span class="extras-total" id="extras-total">0</span>
+                        </div>
+                    </div>
+
+                    <!-- Fall of Wickets -->
+                    <div class="card fow-card">
+                        <h3 class="card-title">Fall of Wickets</h3>
+                        <div class="condensed-fow" id="condensed-fow">No wickets fallen yet.</div>
+                    </div>
+
+                    <!-- Bowling Card -->
+                    <div class="card bowling-card">
+                        <h3 class="card-title" id="bowling-team-title">Bowling</h3>
+                        <table class="cric-table" id="bowling-table">
+                            <thead>
+                                <tr>
+                                    <th>Bowler</th>
+                                    <th class="num-col">O</th>
+                                    <th class="num-col">M</th>
+                                    <th class="num-col">R</th>
+                                    <th class="num-col">W</th>
+                                    <th class="num-col">Econ</th>
+                                </tr>
+                            </thead>
+                            <tbody id="bowling-tbody">
+                                <!-- Dynamically filled -->
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- First innings scorecards (hidden initially, shown when innings 2 starts) -->
+                    <div id="first-innings-container" class="first-innings-container" style="display: none;"></div>
+                </div>
+
+                <!-- Right half: Commentary Feed (scrollable) -->
+                <div class="commentary-half" id="commentary-half">
+                    <div class="commentary-header-row">
+                        <h3 class="card-title">Commentary</h3>
+                        <span class="commentary-page-info" id="commentary-page-info"></span>
+                    </div>
+                    <div class="commentary-feed" id="commentary-feed">
+                        <!-- Commentary items injected here -->
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Floating Gameplay Control Panel -->
+        <footer class="game-controls">
+            <div class="controls-container">
+                <button class="btn btn-bowl" id="btn-bowl" onclick="bowlBall()">Bowl Ball</button>
+                <button class="btn btn-autoplay" id="btn-autoplay" onclick="toggleAutoplay()">Start Autoplay</button>
+                <button class="btn btn-second-innings" id="btn-innings" onclick="startSecondInnings()" style="display: none;">Start 2nd Innings</button>
+                <button class="btn btn-reset" id="btn-reset" onclick="resetMatch()">Reset Match</button>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Script loading -->
+    <script src="app.js"></script>
+</body>
+</html>

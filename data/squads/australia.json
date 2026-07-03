@@ -1,0 +1,126 @@
+{
+  "team_name": "Australia",
+  "players": [
+    {
+      "name": "Usman Khawaja",
+      "role": "Batsman",
+      "batting_hand": "Left-hand bat",
+      "bowling_type": "Right-arm medium",
+      "batting_order": 1,
+      "ratings": {
+        "batting": 0.85,
+        "bowling": 0.10
+      }
+    },
+    {
+      "name": "Steve Smith",
+      "role": "Batsman",
+      "batting_hand": "Right-hand bat",
+      "bowling_type": "Right-arm legbreak",
+      "batting_order": 2,
+      "ratings": {
+        "batting": 0.90,
+        "bowling": 0.30
+      }
+    },
+    {
+      "name": "Marnus Labuschagne",
+      "role": "Batsman",
+      "batting_hand": "Right-hand bat",
+      "bowling_type": "Right-arm legbreak",
+      "batting_order": 3,
+      "ratings": {
+        "batting": 0.82,
+        "bowling": 0.35
+      }
+    },
+    {
+      "name": "Travis Head",
+      "role": "Batsman",
+      "batting_hand": "Left-hand bat",
+      "bowling_type": "Right-arm offbreak",
+      "batting_order": 4,
+      "ratings": {
+        "batting": 0.88,
+        "bowling": 0.40
+      }
+    },
+    {
+      "name": "Cameron Green",
+      "role": "All-rounder",
+      "batting_hand": "Right-hand bat",
+      "bowling_type": "Right-arm fast-medium",
+      "batting_order": 5,
+      "ratings": {
+        "batting": 0.78,
+        "bowling": 0.75
+      }
+    },
+    {
+      "name": "Beau Webster",
+      "role": "All-rounder",
+      "batting_hand": "Right-hand bat",
+      "bowling_type": "Right-arm offbreak / medium",
+      "batting_order": 6,
+      "ratings": {
+        "batting": 0.72,
+        "bowling": 0.65
+      }
+    },
+    {
+      "name": "Alex Carey",
+      "role": "Wicketkeeper-Batsman",
+      "batting_hand": "Left-hand bat",
+      "bowling_type": "None",
+      "batting_order": 7,
+      "ratings": {
+        "batting": 0.75,
+        "bowling": 0.00
+      }
+    },
+    {
+      "name": "Mitchell Starc",
+      "role": "Bowler",
+      "batting_hand": "Left-hand bat",
+      "bowling_type": "Left-arm fast",
+      "batting_order": 8,
+      "ratings": {
+        "batting": 0.45,
+        "bowling": 0.88
+      }
+    },
+    {
+      "name": "Michael Neser",
+      "role": "Bowler",
+      "batting_hand": "Right-hand bat",
+      "bowling_type": "Right-arm fast-medium",
+      "batting_order": 9,
+      "ratings": {
+        "batting": 0.50,
+        "bowling": 0.80
+      }
+    },
+    {
+      "name": "Scott Boland",
+      "role": "Bowler",
+      "batting_hand": "Right-hand bat",
+      "bowling_type": "Right-arm fast-medium",
+      "batting_order": 10,
+      "ratings": {
+        "batting": 0.20,
+        "bowling": 0.82
+      }
+    },
+    {
+      "name": "Nathan Lyon",
+      "role": "Bowler",
+      "batting_hand": "Right-hand bat",
+      "bowling_type": "Right-arm offbreak",
+      "batting_order": 11,
+      "ratings": {
+        "batting": 0.15,
+        "bowling": 0.85
+      }
+    }
+  ]
+}

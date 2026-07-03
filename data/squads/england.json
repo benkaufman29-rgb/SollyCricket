@@ -1,0 +1,126 @@
+{
+  "team_name": "England",
+  "players": [
+    {
+      "name": "Zak Crawley",
+      "role": "Batsman",
+      "batting_hand": "Right-hand bat",
+      "bowling_type": "Right-arm offbreak",
+      "batting_order": 1,
+      "ratings": {
+        "batting": 0.80,
+        "bowling": 0.10
+      }
+    },
+    {
+      "name": "Ben Duckett",
+      "role": "Batsman",
+      "batting_hand": "Left-hand bat",
+      "bowling_type": "Right-arm legbreak",
+      "batting_order": 2,
+      "ratings": {
+        "batting": 0.82,
+        "bowling": 0.05
+      }
+    },
+    {
+      "name": "Joe Root",
+      "role": "Batsman",
+      "batting_hand": "Right-hand bat",
+      "bowling_type": "Right-arm offbreak",
+      "batting_order": 3,
+      "ratings": {
+        "batting": 0.92,
+        "bowling": 0.55
+      }
+    },
+    {
+      "name": "Harry Brook",
+      "role": "Batsman",
+      "batting_hand": "Right-hand bat",
+      "bowling_type": "Right-arm medium",
+      "batting_order": 4,
+      "ratings": {
+        "batting": 0.87,
+        "bowling": 0.20
+      }
+    },
+    {
+      "name": "Ben Stokes",
+      "role": "All-rounder",
+      "batting_hand": "Left-hand bat",
+      "bowling_type": "Right-arm fast-medium",
+      "batting_order": 5,
+      "ratings": {
+        "batting": 0.80,
+        "bowling": 0.78
+      }
+    },
+    {
+      "name": "Jacob Bethell",
+      "role": "All-rounder",
+      "batting_hand": "Left-hand bat",
+      "bowling_type": "Slow left-arm orthodox",
+      "batting_order": 6,
+      "ratings": {
+        "batting": 0.75,
+        "bowling": 0.60
+      }
+    },
+    {
+      "name": "Jamie Smith",
+      "role": "Wicketkeeper-Batsman",
+      "batting_hand": "Right-hand bat",
+      "bowling_type": "None",
+      "batting_order": 7,
+      "ratings": {
+        "batting": 0.78,
+        "bowling": 0.00
+      }
+    },
+    {
+      "name": "Will Jacks",
+      "role": "All-rounder",
+      "batting_hand": "Right-hand bat",
+      "bowling_type": "Right-arm offbreak",
+      "batting_order": 8,
+      "ratings": {
+        "batting": 0.74,
+        "bowling": 0.65
+      }
+    },
+    {
+      "name": "Brydon Carse",
+      "role": "Bowler",
+      "batting_hand": "Right-hand bat",
+      "bowling_type": "Right-arm fast",
+      "batting_order": 9,
+      "ratings": {
+        "batting": 0.35,
+        "bowling": 0.82
+      }
+    },
+    {
+      "name": "Matthew Potts",
+      "role": "Bowler",
+      "batting_hand": "Right-hand bat",
+      "bowling_type": "Right-arm fast-medium",
+      "batting_order": 10,
+      "ratings": {
+        "batting": 0.25,
+        "bowling": 0.80
+      }
+    },
+    {
+      "name": "Josh Tongue",
+      "role": "Bowler",
+      "batting_hand": "Right-hand bat",
+      "bowling_type": "Right-arm fast-medium",
+      "batting_order": 11,
+      "ratings": {
+        "batting": 0.15,
+        "bowling": 0.78
+      }
+    }
+  ]
+}
