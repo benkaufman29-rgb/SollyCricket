@@ -190,16 +190,16 @@ def _is_valid_commentary(text: str) -> bool:
     return True
 
 
-def call_openrouter(prompt: str, timeout: float = 15.0) -> str | None:
+def call_openrouter(prompt: str, timeout: float = 10.0) -> str | None:
     """Call OpenRouter API with retry and exponential backoff on rate limits.
 
     When a 429 (Too Many Requests) is hit:
       - Wait 1s, retry same model
       - Then 2s, retry same model
-      - Then 4s, retry same model
       - Then move to next model in the whitelist
 
     Respects OpenRouter's Retry-After header if present.
+    Includes jitter to spread out concurrent requests.
     """
     api_key = os.environ.get("OPENROUTER_API_KEY")
     if not api_key:
@@ -222,21 +222,22 @@ def call_openrouter(prompt: str, timeout: float = 15.0) -> str | None:
 
         # Retry with exponential backoff for this model
         backoff = 1.0
-        for attempt in range(4):  # 3 retries + 1 initial
+        for attempt in range(3):  # 2 retries + 1 initial
             try:
                 resp = requests.post(
                     OPENROUTER_URL, json=payload, headers=headers, timeout=timeout
                 )
                 if resp.status_code == 429:
-                    # Respect Retry-After header, or use exponential backoff
+                    # Respect Retry-After header, or use exponential backoff + jitter
                     retry_after = resp.headers.get("Retry-After")
                     wait = float(retry_after) if retry_after else backoff
+                    jitter = random.uniform(0, 0.5)  # 0-500ms jitter
                     logger.info(
-                        f"429 rate limited on {model}, retrying in {wait:.0f}s "
-                        f"(attempt {attempt + 1}/4)"
+                        f"429 rate limited on {model}, retrying in {wait:.1f}s "
+                        f"(attempt {attempt + 1}/3)"
                     )
-                    time.sleep(wait)
-                    backoff = min(backoff * 2, 8.0)  # Cap at 8s
+                    time.sleep(wait + jitter)
+                    backoff = min(backoff * 2, 4.0)  # Cap at 4s
                     continue
 
                 resp.raise_for_status()
@@ -247,12 +248,12 @@ def call_openrouter(prompt: str, timeout: float = 15.0) -> str | None:
                     return text.strip()[:150]
                 break  # Empty response isn't a retry-able error
             except requests.RequestException as e:
-                if attempt < 3:
+                if attempt < 2 and "429" not in str(e):
                     logger.info(f"{model} attempt {attempt + 1} failed: {e}, retrying...")
-                    time.sleep(backoff)
-                    backoff = min(backoff * 2, 8.0)
+                    time.sleep(backoff + random.uniform(0, 0.5))
+                    backoff = min(backoff * 2, 4.0)
                 else:
-                    logger.warning(f"Model {model} failed after 4 attempts: {e}")
+                    logger.warning(f"Model {model} failed after {attempt + 1} attempts: {e}")
 
     logger.error("All OpenRouter models failed")
     return None
