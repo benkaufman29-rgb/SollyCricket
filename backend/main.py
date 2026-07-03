@@ -13,8 +13,9 @@ import os
 import random
 import re
 import time
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 import requests
 
@@ -261,6 +262,16 @@ def call_openrouter(prompt: str, timeout: float = 15.0) -> str | None:
 # Endpoint
 # ---------------------------------------------------------------------------
 
+@app.exception_handler(Exception)
+def handle_uncaught(req: Request, exc: Exception):
+    """Catch-all so we never return a 500 to the desktop app."""
+    logger.error(f"Unhandled exception: {exc}")
+    return JSONResponse(
+        status_code=500,
+        content={"commentary": None, "error": "Internal server error"},
+    )
+
+
 @app.post("/commentary", response_model=CommentaryResponse)
 def generate_commentary(req: CommentaryRequest):
     """Generate commentary for a ball outcome via OpenRouter.
@@ -288,11 +299,13 @@ def generate_commentary(req: CommentaryRequest):
     if llm_text and _is_valid_commentary(llm_text):
         return CommentaryResponse(commentary=llm_text.strip())
 
-    # Last resort: a simple template fallback on the server side.
-    # The desktop app also has its own template fallback, but this
-    # ensures we always return something even if the desktop doesn't.
-    template = _template_fallback(req.outcome)
-    return CommentaryResponse(commentary=template, error="LLM unavailable, used template")
+    # Last resort: template fallback (only when we have outcome+context).
+    # The desktop app also has its own template fallback, so when only a
+    # prompt was sent, we return None and let the desktop handle it.
+    if req.outcome:
+        template = _template_fallback(req.outcome)
+        return CommentaryResponse(commentary=template, error="LLM unavailable, used template")
+    return CommentaryResponse(commentary=None, error="LLM unavailable")
 
 
 def _template_fallback(outcome: dict) -> str:
