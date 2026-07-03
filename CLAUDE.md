@@ -1,32 +1,36 @@
 # SollyCricket — Project Documentation
 
 ## Overview
-A desktop cricket simulation game with an ESPNcricinfo-style UI. Built with Python (`pywebview`) for the engine and HTML/CSS/JS for the frontend. Packaged as a standalone Windows executable.
+A desktop cricket simulation game with an ESPNcricinfo-style UI. Built with Python (`pywebview`) for the engine and HTML/CSS/JS for the frontend. Packaged as a standalone Windows executable. LLM commentary is powered by a FastAPI backend on Render, keeping the API key server-side.
 
 ## Current State (July 2026)
 Everything is implemented and working:
 - **Match engine** with ball-by-ball simulation, wickets, extras, strike rotation
-- **Commentary system** with template mode (always) + optional LLM mode via API
+- **Commentary system** with template mode (always) + optional LLM mode via FastAPI backend
 - **Desktop GUI** with a 50/50 split layout:
   - Left half: Batting scorecard → Bowling scorecard → Condensed Fall of Wickets
   - Right half: Scrollable commentary feed (newest first)
 - **Controls**: Bowl Ball, Autoplay, Start 2nd Innings, Reset Match
 - **Pre‑loaded squads**: Australia and England (Ashes)
-- **API key input** on the start screen for enabling LLM commentary
+- **Clean start screen** — no API key input (key lives on Render server)
 
 ## Project Structure
 
 ```
 project-solly-cricket/
+├── backend/
+│   ├── main.py                   # FastAPI app — POST /commentary, proxies to OpenRouter
+│   ├── requirements.txt          # fastapi, uvicorn, requests
+│   └── README.md                 # Render deployment instructions
 ├── engine/
 │   ├── models.py                 # Player, Team, BallOutcome, Innings, MatchState
 │   ├── simulator.py              # Delivery simulation + get_next_bowler
 │   ├── commentary_templates.py   # Shared template data (no circular imports)
 │   └── commentary_llm.py         # Multi-provider LLM client + graceful fallback
 ├── gui/
-│   ├── index.html                # Single‑page layout + start screen with API key input
+│   ├── index.html                # Single‑page layout + clean start screen
 │   ├── style.css                 # Cricinfo-inspired styling (blue/slate palette)
-│   └── app.js                    # UI updates, API bridge calls, autoplay, key UI logic
+│   └── app.js                    # UI updates, API bridge calls, autoplay
 ├── data/squads/
 │   ├── australia.json            # Australia squad
 │   └── england.json              # England squad
@@ -34,10 +38,12 @@ project-solly-cricket/
 ├── gui_main.py                   # Python entry point — Api class, webview launch
 ├── assets/
 │   └── SC.png                    # Game logo (shown on start screen)
-├── requirements.txt              # pywebview, pyinstaller
+├── requirements.txt              # pywebview, pyinstaller, requests
 ├── CLAUDE.md                     # This file
-├── commentary_config.example.json # Template for API key config file
-├── commentary_config.json        # API key storage (created at runtime, gitignored)
+├── commentary_config.example.json # Template for API key config file (legacy)
+├── tests/
+│   ├── __init__.py
+│   └── test_engine.py            # Unit tests for match engine
 └── dist/
     └── SollyCricket.exe          # Packaged standalone executable
 ```
@@ -68,48 +74,40 @@ Output: `dist/SollyCricket.exe`
 
 The game supports commentary generation with automatic fallback:
 
-1. **Template mode** (always available): Picks a random template from `engine/commentary_templates.py` and formats in player names. Fast and deterministic.
+1. **Template mode** (always available): Picks a random template from `engine/commentary_templates.py` and formats in player names. Fast and deterministic. Works fully offline.
 
-2. **LLM mode** (optional): Generates varied, context-aware commentary via a cloud API provider. **No local model downloads.** If the API call fails or no key is configured, it falls back silently to templates.
+2. **LLM mode** (optional): Generates varied, context-aware commentary via a FastAPI backend on Render. **No local model downloads, no API key on the client.** If the backend call fails (cold start, network error, rate limit), it falls back silently to templates.
 
-**Providers (auto-probed in order):**
+**Primary path (auto-detected, no config needed):**
+
+| Provider | How it works | Notes |
+|---|---|---|
+| **solly_backend** | Desktop sends prompt to `https://solly-cricket-api.onrender.com/commentary` → backend calls OpenRouter with server-side key | Auto-selected by default. Override URL via `SOLLY_BACKEND_URL` env var. |
+
+**Legacy providers (fallback, require env var set):**
 
 | # | Provider | Key env var | Free tier | Notes |
 |---|---|---|---|---|
-| 1 | **OpenRouter** | `OPENROUTER_API_KEY` | Yes | Routes to free models; preferred models: `google/gemma-4-26b-a4b-it:free`, `google/gemma-4-31b-it:free`, `openrouter/free` |
+| 1 | **OpenRouter** | `OPENROUTER_API_KEY` | Yes | Direct client-side call (for dev) |
 | 2 | **Gemini** | `GEMINI_API_KEY` | 60 req/min | Google's flash model |
 | 3 | **Groq** | `GROQ_API_KEY` | 30 req/min | Llama 3.1 8B on fast LPUs |
 | 4 | **OpenAI** | `OPENAI_API_KEY` | No | GPT-4o-mini (~$0.001/match) |
 | 5 | **Ollama** | None (local) | Yes | Requires Ollama installed & running |
 
-**Key resolution order** (highest priority first):
-1. Environment variable (e.g. `OPENROUTER_API_KEY`)
-2. `commentary_config.json` file in the game directory
+### Render Backend (`backend/main.py`)
 
-### API Key Input (Start Screen)
+Single FastAPI endpoint `POST /commentary` deployed on Render:
+- Accepts `{"prompt": "..."}` (pre-built prompt from desktop) or `{"outcome": ..., "context": ...}` (for server-side prompt building)
+- Holds `OPENROUTER_API_KEY` as a Render environment variable
+- Retries with exponential backoff (1s → 2s, jittered) on 429 rate limits
+- Falls back to a server-side template if all models fail
+- Health check at `GET /health`
+- Model whitelist (server-side): `google/gemma-4-26b-a4b-it:free` → `google/gemma-4-31b-it:free` → `openrouter/free`
 
-The start screen has a password-masked text input for an OpenRouter API key:
-- **Show/hide toggle** button to reveal the key
-- **Status indicator** shows green "✓ LLM commentary active" if a key is detected, or instructions to get one
-- Key is saved to `commentary_config.json` for persistence across launches
-- Can also be set via `OPENROUTER_API_KEY` env var (useful for development)
-
-### Model Whitelist (OpenRouter)
-
-OpenRouter tries models in order, falling back to the next if one fails or returns empty text:
-
-Default whitelist (in `engine/commentary_llm.py`):
-```
-google/gemma-4-26b-a4b-it:free  →  google/gemma-4-31b-it:free  →  openrouter/free
-```
-
-Override via `commentary_config.json`:
-```json
-{
-    "openrouter_api_key": "sk-or-v1-...",
-    "openrouter_models": ["google/gemma-4-26b-a4b-it:free", "custom/model:free"]
-}
-```
+### Render Free Tier Notes
+- Spins down after 15 min of inactivity (~30s cold start on next request)
+- The desktop's 20s timeout may cause the first ball after idle to use template commentary; subsequent balls hit the warm backend
+- Paid plan ($7/mo) eliminates cold starts
 
 ### Accurate Post-Delivery Context
 
@@ -130,7 +128,7 @@ Autoplay uses recursive `setTimeout` instead of `setInterval`:
 
 ### Frontend ↔ Backend bridge
 - `gui_main.py` defines an `Api` class exposed to JavaScript via pywebview.
-- `app.js` calls `pywebview.api.get_state()`, `.step_ball()`, `.reset_match()`, `.start_second_innings()`, `.set_api_key()`, `.get_commentary_status()`.
+- `app.js` calls `pywebview.api.get_state()`, `.step_ball()`, `.reset_match()`, `.start_second_innings()`, `.get_commentary_status()`.
 - Each call returns a JSON state object that `updateUI()` renders into the DOM.
 
 ### Data flow
@@ -156,5 +154,6 @@ Extended with:
 - The `main.py` terminal version is kept for reference but is not the active interface.
 - Squad data is bundled inside the executable via `--add-data`, so `data/` and `gui/` paths must stay relative to the source tree.
 - The window title is set in `gui_main.py` in the `webview.create_window()` call.
-- `commentary_config.json` is created at runtime when a key is entered via the UI — it should be in `.gitignore` if added to version control.
-- LLM commentary requires internet access; template mode works fully offline.
+- The Render backend URL defaults to `https://solly-cricket-api.onrender.com` — override via `SOLLY_BACKEND_URL` env var for local dev or custom deployments.
+- LLM commentary requires internet access and a running Render backend; template mode works fully offline.
+- See `backend/README.md` for detailed Render deployment instructions.
