@@ -20,3 +20,6 @@ commentary_config.json
 # OS
 .DS_Store
 Thumbs.db
+
+# Claude Code local settings (secrets, permissions)
+.claude/

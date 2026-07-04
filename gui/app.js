@@ -22,8 +22,230 @@ function startMatch() {
     setTimeout(() => {
         overlay.style.display = 'none';
     }, 600);
-    // Load the match state
-    loadMatchState();
+    // Show the team setup page
+    showTeamSetup();
+}
+
+// ================ Team Setup Page ================
+
+function showTeamSetup() {
+    const setupOverlay = document.getElementById('setup-overlay');
+    setupOverlay.style.display = 'flex';
+    setupOverlay.classList.remove('hidden');
+    setupOverlay.classList.add('visible');
+    loadSquadData();
+}
+
+function showStartScreen() {
+    const setupOverlay = document.getElementById('setup-overlay');
+    setupOverlay.classList.add('hidden');
+    setTimeout(() => {
+        setupOverlay.style.display = 'none';
+    }, 600);
+    // Show the start screen again
+    const startOverlay = document.getElementById('start-overlay');
+    startOverlay.style.display = 'flex';
+    startOverlay.classList.remove('hidden');
+}
+
+function loadSquadData() {
+    // First check localStorage for saved data
+    const saved = loadSquadFromLocalStorage();
+    if (saved) {
+        // Use stored data as default (it has the full player fields from the last play)
+        window._squadDefaults = saved;
+        populateSetupForm(saved);
+        // Also fetch Python defaults in background for "Reset to Defaults" button
+        if (window.pywebview && window.pywebview.api) {
+            window.pywebview.api.get_squad_data().then(defaults => {
+                window._squadDefaults = defaults;
+            });
+        }
+        return;
+    }
+    // Otherwise fetch defaults from Python
+    if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.get_squad_data().then(data => {
+            window._squadDefaults = data;
+            populateSetupForm(data);
+        });
+    }
+}
+
+function populateSetupForm(data) {
+    if (!data || !data.teams || data.teams.length < 2) return;
+
+    // Restore match overs if saved
+    if (data.match_overs) {
+        document.getElementById('setup-overs').value = data.match_overs;
+    }
+
+    // Team 1
+    const team1 = data.teams[0];
+    document.getElementById('setup-team1-name').value = team1.team_name || '';
+    const container1 = document.getElementById('setup-team1-players');
+    container1.innerHTML = '';
+    team1.players.forEach((player, idx) => {
+        container1.appendChild(createPlayerRow(player, idx + 1, 1));
+    });
+
+    // Team 2
+    const team2 = data.teams[1];
+    document.getElementById('setup-team2-name').value = team2.team_name || '';
+    const container2 = document.getElementById('setup-team2-players');
+    container2.innerHTML = '';
+    team2.players.forEach((player, idx) => {
+        container2.appendChild(createPlayerRow(player, idx + 1, 2));
+    });
+}
+
+function createPlayerRow(player, order, teamIndex) {
+    const row = document.createElement('div');
+    row.className = 'setup-player-row';
+
+    const roleLower = (player.role || '').toLowerCase();
+    let roleClass = '';
+    if (roleLower.includes('wicket')) {
+        roleClass = 'wicketkeeper';
+    } else if (roleLower.includes('all-rounder') || roleLower.includes('allrounder')) {
+        roleClass = 'all-rounder';
+    } else if (roleLower.includes('bowl')) {
+        roleClass = 'bowler';
+    } else {
+        roleClass = 'batsman';
+    }
+
+    const isCaptain = player.is_captain === true;
+    const captainName = `captain-team${teamIndex}`;
+
+    row.innerHTML = `
+        <span class="setup-player-order">${order}</span>
+        <input type="text" class="setup-name-input" value="${escapeHtml(player.name)}" placeholder="Player name">
+        <span class="setup-role-badge ${roleClass}">${escapeHtml(player.role)}</span>
+        <label class="setup-captain-label" title="Designate as captain">
+            <input type="radio" name="${captainName}" class="setup-captain-radio" ${isCaptain ? 'checked' : ''}>
+            <span class="setup-captain-badge ${isCaptain ? 'active' : ''}">C</span>
+        </label>
+    `;
+
+    // Update badge on radio change
+    const radio = row.querySelector('.setup-captain-radio');
+    const badge = row.querySelector('.setup-captain-badge');
+    radio.addEventListener('change', () => {
+        // Deactivate all captain badges in this team, then activate this one
+        const teamContainer = row.closest('.setup-team');
+        teamContainer.querySelectorAll('.setup-captain-badge').forEach(b => b.classList.remove('active'));
+        if (radio.checked) {
+            badge.classList.add('active');
+        }
+    });
+
+    return row;
+}
+
+function escapeHtml(str) {
+    if (!str) return '';
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function collectSquadData() {
+    const oversInput = document.getElementById('setup-overs');
+    let overs = parseInt(oversInput.value, 10);
+    if (isNaN(overs) || overs < 1) overs = 5;
+    if (overs > 50) overs = 50;
+
+    const data = { match_overs: overs, teams: [] };
+
+    [1, 2].forEach(teamIdx => {
+        const nameInput = document.getElementById(`setup-team${teamIdx}-name`);
+        const playersContainer = document.getElementById(`setup-team${teamIdx}-players`);
+        const nameRows = playersContainer.querySelectorAll('.setup-player-row');
+
+        const players = [];
+        const originalData = window._squadDefaults || { teams: [{players:[]}, {players:[]}] };
+        const originalPlayers = originalData.teams[teamIdx - 1]?.players || [];
+
+        // Find which radio is checked for captain in this team
+        const captainRadio = playersContainer.querySelector(`input[name="captain-team${teamIdx}"]:checked`);
+        const captainIndex = captainRadio
+            ? Array.from(playersContainer.querySelectorAll(`input[name="captain-team${teamIdx}"]`)).indexOf(captainRadio)
+            : -1;
+
+        nameRows.forEach((row, idx) => {
+            const nameInput = row.querySelector('.setup-name-input');
+            // Preserve all original player data (role, ratings, etc.), just update the name
+            const originalPlayer = originalPlayers[idx] || {};
+            players.push({
+                ...originalPlayer,
+                name: nameInput.value.trim() || originalPlayer.name || 'Player',
+                is_captain: idx === captainIndex
+            });
+        });
+
+        data.teams.push({
+            team_name: nameInput.value.trim() || originalData.teams[teamIdx - 1]?.team_name || `Team ${teamIdx}`,
+            players: players
+        });
+    });
+
+    return data;
+}
+
+function resetSquadDefaults() {
+    localStorage.removeItem('solly-cricket-last-squads');
+    document.getElementById('setup-overs').value = 5;
+    if (window.pywebview && window.pywebview.api) {
+        window.pywebview.api.get_squad_data().then(data => {
+            populateSetupForm(data);
+        });
+    }
+}
+
+function playMatch() {
+    const squadData = collectSquadData();
+
+    // Save to localStorage for next time
+    saveSquadToLocalStorage(squadData);
+
+    if (window.pywebview && window.pywebview.api) {
+        const btn = document.getElementById('btn-play-match');
+        btn.disabled = true;
+        btn.innerText = 'Starting...';
+
+        window.pywebview.api.start_with_custom_squads(JSON.stringify(squadData)).then(state => {
+            // Hide setup overlay
+            const setupOverlay = document.getElementById('setup-overlay');
+            setupOverlay.classList.add('hidden');
+            setTimeout(() => {
+                setupOverlay.style.display = 'none';
+            }, 600);
+            // Load the match
+            updateUI(state);
+        }).catch(() => {
+            btn.disabled = false;
+            btn.innerText = 'Play Match →';
+        });
+    }
+}
+
+function saveSquadToLocalStorage(data) {
+    try {
+        localStorage.setItem('solly-cricket-last-squads', JSON.stringify(data));
+    } catch (e) {
+        // localStorage may be full or unavailable
+    }
+}
+
+function loadSquadFromLocalStorage() {
+    try {
+        const saved = localStorage.getItem('solly-cricket-last-squads');
+        if (saved) {
+            return JSON.parse(saved);
+        }
+    } catch (e) {
+        // ignore
+    }
+    return null;
 }
 
 // Fallback in case we are testing in a standard browser
@@ -41,9 +263,68 @@ function loadMatchState() {
     }
 }
 
+function getCurrentBowlerName() {
+    const state = window._lastState;
+    if (!state) return null;
+    const innings = state.innings_number === 1 ? state.innings1 : state.innings2;
+    if (!innings || !innings.current_bowler) return null;
+    return innings.current_bowler.name;
+}
+
+function showPendingDelivery() {
+    const feed = document.getElementById('commentary-feed');
+    const bowler = getCurrentBowlerName() || 'Bowler';
+
+    // Compute next ball number
+    const state = window._lastState;
+    let ballNum = '0.0';
+    if (state) {
+        const innings = state.innings_number === 1 ? state.innings1 : state.innings2;
+        if (innings) {
+            let legalBalls = 0;
+            let idx = (innings.commentary || []).length - 1;
+            while (idx >= 0) {
+                const c = innings.commentary[idx];
+                if (c.is_summary) { idx--; continue; }
+                if (c.extra_type !== 'w' && c.extra_type !== 'nb') legalBalls++;
+                idx--;
+            }
+            const over = Math.floor(legalBalls / 6);
+            const ball = (legalBalls % 6) + 1;
+            ballNum = `${over}.${ball}`;
+        }
+    }
+
+    const pendingEl = document.createElement('div');
+    pendingEl.className = 'comm-item-pending';
+    pendingEl.id = 'pending-delivery';
+    pendingEl.innerHTML = `
+        <div class="comm-ball">${ballNum}</div>
+        <div class="comm-bubble"></div>
+        <div class="comm-text-container">
+            <div class="comm-title">${bowler} runs in to bowl…</div>
+        </div>
+    `;
+    feed.insertBefore(pendingEl, feed.firstChild);
+}
+
+function clearPendingDelivery() {
+    const pending = document.getElementById('pending-delivery');
+    if (pending) pending.remove();
+}
+
 function bowlBall() {
     if (window.pywebview && window.pywebview.api) {
-        window.pywebview.api.step_ball().then(updateUI);
+        document.getElementById('btn-bowl').classList.add('loading');
+        showPendingDelivery();
+        window.pywebview.api.step_ball().then(state => {
+            document.getElementById('btn-bowl').classList.remove('loading');
+            clearPendingDelivery();
+            updateUI(state);
+        }).catch(() => {
+            document.getElementById('btn-bowl').classList.remove('loading');
+            clearPendingDelivery();
+        });
     }
 }
 
@@ -65,7 +346,9 @@ function toggleAutoplay() {
 function doAutoplay() {
     if (!autoplayInterval) return;  // User stopped autoplay
     if (window.pywebview && window.pywebview.api) {
+        showPendingDelivery();
         window.pywebview.api.step_ball().then(state => {
+            clearPendingDelivery();
             // IMPORTANT: user may have pressed Stop while this promise was
             // in flight — don't re-schedule if autoplay is cancelled.
             if (!autoplayInterval) return;
@@ -77,13 +360,21 @@ function doAutoplay() {
                 // Schedule next ball only after this one completes
                 autoplayInterval = setTimeout(doAutoplay, 1200);
             }
+        }).catch(() => {
+            clearPendingDelivery();
         });
     }
 }
 
 function startSecondInnings() {
     if (window.pywebview && window.pywebview.api) {
-        window.pywebview.api.start_second_innings().then(updateUI);
+        document.getElementById('btn-innings').disabled = true;
+        window.pywebview.api.start_second_innings().then(state => {
+            document.getElementById('btn-innings').disabled = false;
+            updateUI(state);
+        }).catch(() => {
+            document.getElementById('btn-innings').disabled = false;
+        });
     }
 }
 
@@ -244,7 +535,20 @@ function updateUI(state) {
 
     // 6. Update Commentary Feed (with pagination)
     renderCommentary(state);
+
+    // 7. Check for end-of-match — summary already in commentary feed from backend
+    if (state.innings_number === 2 && state.innings2 && state.innings2.is_completed) {
+        // The match summary + interviews are already part of the commentary data
+        // from the backend. Just make sure the feed is scrolled into view.
+        const feed = document.getElementById('commentary-feed');
+        // Scroll to top so user sees the newest (match summary) entries
+        const commentaryHalf = document.getElementById('commentary-half');
+        if (commentaryHalf) commentaryHalf.scrollTop = 0;
+    }
 }
+
+// End-of-match summary is rendered as commentary entries by the backend,
+// so no popup modal is needed. Entries appear in the commentary feed directly.
 
 /**
  * Build full scorecard HTML (batting + bowling + FOW) for a given innings.
@@ -375,6 +679,7 @@ function renderCommentary(state) {
     let currentInnings = allComms.length > 0 ? allComms[0].innings : 1;
     for (let i = 0; i < allComms.length; i++) {
         let outcome = allComms[i];
+        if (outcome.is_summary) continue;  // Skip summary entries for ball counting
         if (outcome.innings !== currentInnings) {
             legalBalls = 0;
             currentInnings = outcome.innings;
@@ -423,6 +728,38 @@ function renderCommentary(state) {
             feed.appendChild(divider);
         }
         lastInnings = outcome.innings;
+
+        // Handle summary-type entries (over, innings, match, interview summaries)
+        if (outcome.is_summary) {
+            const summaryItem = document.createElement('div');
+            let icon = '📊', title = 'Over Summary';
+            if (outcome.summary_type === 'over') {
+                summaryItem.className = 'comm-item comm-over-summary';
+                icon = '📊';
+                title = 'Over Summary';
+            } else if (outcome.summary_type === 'innings') {
+                summaryItem.className = 'comm-item comm-innings-summary';
+                icon = '🏏';
+                title = 'End of Innings';
+            } else if (outcome.summary_type === 'interview') {
+                summaryItem.className = 'comm-item comm-interview';
+                icon = '🎙️';
+                title = 'Post-Match Interview';
+            } else {
+                summaryItem.className = 'comm-item comm-match-summary';
+                icon = '🏆';
+                title = 'Match Summary';
+            }
+            summaryItem.innerHTML = `
+                <div class="comm-summary-icon">${icon}</div>
+                <div class="comm-text-container">
+                    <div class="comm-title">${title}</div>
+                    <div class="comm-body">${outcome.description}</div>
+                </div>
+            `;
+            feed.appendChild(summaryItem);
+            return;
+        }
 
         const commItem = document.createElement('div');
         commItem.className = 'comm-item';

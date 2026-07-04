@@ -109,6 +109,20 @@ Single FastAPI endpoint `POST /commentary` deployed on Render:
 - The desktop's 20s timeout may cause the first ball after idle to use template commentary; subsequent balls hit the warm backend
 - Paid plan ($7/mo) eliminates cold starts
 
+### Render Deploy (via API)
+Service: `solly-cricket-api` (ID: `srv-d93gjh1kh4rs73d8pn5g`)
+- Auto-deploy is enabled on `git push` to `master` — pushes to GitHub trigger a rebuild automatically
+- To trigger a deploy via API (no push needed, uses `$RENDER_API_KEY` from `.claude/settings.local.json`):
+  ```bash
+  curl -s -X POST -H "Authorization: Bearer $RENDER_API_KEY" \
+    "https://api.render.com/v1/services/srv-d93gjh1kh4rs73d8pn5g/deploys"
+  ```
+- Check deploy status:
+  ```bash
+  curl -s -H "Authorization: Bearer $RENDER_API_KEY" \
+    "https://api.render.com/v1/services/srv-d93gjh1kh4rs73d8pn5g/deploys?limit=3"
+  ```
+
 ### Accurate Post-Delivery Context
 
 The LLM receives the **actual post-delivery** match state, not the pre-delivery snapshot. Flow in `step_ball()`:
