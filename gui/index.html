@@ -25,6 +25,47 @@
         </div>
     </div>
 
+    <!-- Team Setup Overlay -->
+    <div class="setup-overlay" id="setup-overlay">
+        <div class="setup-content">
+            <h1 class="setup-title">TEAM LINEUPS</h1>
+            <p class="setup-subtitle">Enter player names and designate a captain (C) for each team. Roles are fixed for simulation.</p>
+
+            <div class="setup-columns">
+                <!-- Team 1 Column -->
+                <div class="setup-team" id="setup-team1">
+                    <input type="text" class="setup-team-name" id="setup-team1-name" placeholder="Team 1 Name">
+                    <div class="setup-players" id="setup-team1-players">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+
+                <!-- VS Divider -->
+                <div class="setup-vs">VS</div>
+
+                <!-- Team 2 Column -->
+                <div class="setup-team" id="setup-team2">
+                    <input type="text" class="setup-team-name" id="setup-team2-name" placeholder="Team 2 Name">
+                    <div class="setup-players" id="setup-team2-players">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+            </div>
+
+            <div class="setup-overs-row">
+                <label for="setup-overs" class="setup-overs-label">Match Length</label>
+                <input type="number" class="setup-overs-input" id="setup-overs" value="5" min="1" max="50" step="1">
+                <span class="setup-overs-suffix">overs</span>
+            </div>
+
+            <div class="setup-actions">
+                <button class="btn btn-back-setup" id="btn-back-setup" onclick="showStartScreen()">← Back</button>
+                <button class="btn btn-reset-setup" id="btn-reset-setup" onclick="resetSquadDefaults()">Reset to Defaults</button>
+                <button class="start-btn" id="btn-play-match" onclick="playMatch()">Play Match →</button>
+            </div>
+        </div>
+    </div>
+
     <div class="app-container">
         <!-- Match Summary Banner Header -->
         <header class="match-header" id="match-header">
@@ -111,14 +152,17 @@
                     <div class="commentary-feed" id="commentary-feed">
                         <!-- Commentary items injected here -->
                     </div>
-                </div>
+                                    </div>
             </div>
         </main>
 
         <!-- Floating Gameplay Control Panel -->
         <footer class="game-controls">
             <div class="controls-container">
-                <button class="btn btn-bowl" id="btn-bowl" onclick="bowlBall()">Bowl Ball</button>
+                <button class="btn btn-bowl" id="btn-bowl" onclick="bowlBall()">
+                    <span class="btn-label">Bowl Ball</span>
+                    <span class="btn-spinner"></span>
+                </button>
                 <button class="btn btn-autoplay" id="btn-autoplay" onclick="toggleAutoplay()">Start Autoplay</button>
                 <button class="btn btn-second-innings" id="btn-innings" onclick="startSecondInnings()" style="display: none;">Start 2nd Innings</button>
                 <button class="btn btn-reset" id="btn-reset" onclick="resetMatch()">Reset Match</button>

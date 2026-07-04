@@ -54,7 +54,8 @@
       "ratings": {
         "batting": 0.80,
         "bowling": 0.78
-      }
+      },
+      "is_captain": true
     },
     {
       "name": "Jacob Bethell",
@@ -80,12 +81,12 @@
     },
     {
       "name": "Will Jacks",
-      "role": "All-rounder",
+      "role": "Bowler",
       "batting_hand": "Right-hand bat",
       "bowling_type": "Right-arm offbreak",
       "batting_order": 8,
       "ratings": {
-        "batting": 0.74,
+        "batting": 0.44,
         "bowling": 0.65
       }
     },

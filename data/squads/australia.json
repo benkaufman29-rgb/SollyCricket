@@ -21,7 +21,8 @@
       "ratings": {
         "batting": 0.90,
         "bowling": 0.30
-      }
+      },
+      "is_captain": true
     },
     {
       "name": "Marnus Labuschagne",
