@@ -191,6 +191,11 @@ def _build_prompt(outcome: dict, context: dict) -> str:
         star = "" if outcome.get("is_wicket") else "*"
         parts.append(f"{outcome['batsman_name']} on {batsman_runs}{star} ({batsman_balls} balls)")
 
+    # Milestone (e.g. fifty, century)
+    milestone = context.get("milestone")
+    if milestone:
+        parts.append(f"Milestone alert: {milestone}")
+
     # Recent deliveries context (numbered, newest-first)
     recent = context.get("recent_commentary", [])
     if recent:
@@ -214,12 +219,20 @@ def _build_prompt(outcome: dict, context: dict) -> str:
             "descriptions from the earlier commentary listed above.\n"
         )
 
+    milestone_instruction = ""
+    if milestone:
+        milestone_instruction = (
+            f"{milestone}. This is a milestone moment — "
+            "LEAD with the milestone in your sentence, then describe the shot.\n"
+        )
+
     prompt = (
         "You are a cricket commentator. "
         "Reply with ONE short, lively sentence (max 20 words) describing this delivery. "
         f"Delivery: {event}. "
         f"Match context: {context_str}.\n\n"
         f"{variation_instruction}"
+        f"{milestone_instruction}"
         "CRITICAL: Output ONLY the commentary sentence. NO word count, NO reasoning, "
         "NO labels like 'Commentary:', NO meta-text, NO safety disclaimers. "
         "Just the sentence itself."
@@ -243,7 +256,7 @@ def _call_gemini(prompt: str, timeout: float = 3.0) -> str | None:
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {
             "temperature": 0.8,
-            "maxOutputTokens": 60,
+            "maxOutputTokens": 150,
             "stopSequences": ["\n"],
         },
     }
@@ -270,7 +283,7 @@ def _call_groq(prompt: str, timeout: float = 3.0) -> str | None:
         "model": PROVIDERS["groq"]["model"],
         "messages": [{"role": "user", "content": prompt}],
         "temperature": 0.8,
-        "max_tokens": 60,
+        "max_tokens": 150,
         "stop": ["\n"],
     }
     headers = {"Authorization": f"Bearer {api_key}"}
@@ -313,7 +326,7 @@ def _call_openrouter(prompt: str, timeout: float = 10.0) -> str | None:
             "model": model,
             "messages": [{"role": "user", "content": prompt}],
             "temperature": 0.8,
-            "max_tokens": 500,
+            "max_tokens": 1024,
         }
         try:
             resp = requests.post(
@@ -328,7 +341,7 @@ def _call_openrouter(prompt: str, timeout: float = 10.0) -> str | None:
             # Some reasoning models put content in the 'reasoning' field
             text = choice.get("content") or choice.get("reasoning") or ""
             if text.strip():
-                return text.strip()[:150]
+                return text.strip()
         except Exception as e:
             logger.debug(f"OpenRouter model {model} failed: {e}")
             continue  # Try next model in whitelist
@@ -555,6 +568,171 @@ def _template_fallback(outcome: dict) -> str:
             batsman=outcome["batsman_name"],
             bowler=outcome["bowler_name"],
         )
+
+
+# ---------------------------------------------------------------------------
+# Summary generation (over, innings, match)
+# ---------------------------------------------------------------------------
+
+def _build_over_summary_prompt(data: dict) -> str:
+    """Build a detailed commentator-perspective prompt for an end-of-over summary."""
+    lines = [
+        f"Over {data['over_number']} just finished. "
+        f"{data['runs']} runs, {data['wickets']} wicket(s), "
+        f"bowled by {data['bowler_name']}."
+    ]
+    if data.get('ball_breakdown'):
+        lines.append(f"Ball-by-ball: {data['ball_breakdown']}.")
+    if data['is_maiden']:
+        lines.append("It was a maiden.")
+    lines.append(f"Score: {data['score']}/{data['total_wickets']} after {data['over_str']}, RR {data['run_rate']}.")
+    if data.get('striker_name'):
+        lines.append(f"Striker: {data['striker_name']}, non-striker: {data['non_striker_name']}.")
+
+    context_str = " ".join(lines)
+
+    prompt = (
+        "You are a cricket commentator. "
+        "Speak in 2 sentences (max 40 words total) summarising the over just bowled, "
+        "from a commentator's on-air perspective.\n\n"
+        f"Context: {context_str}.\n\n"
+        "CRITICAL: Reply with ONLY the commentary. "
+        "No labels, no word count, no meta-text. Just the on-air summary."
+    )
+    return prompt
+
+
+def _build_innings_summary_prompt(data: dict) -> str:
+    """Build a detailed commentator-perspective prompt for an end-of-innings summary."""
+    lines = [
+        f"End of innings — {data['batting_team']}: {data['score']}/{data['wickets']} "
+        f"in {data['overs']} overs, RR {data['run_rate']}."
+    ]
+    ts = data.get('top_scorer', {})
+    if ts.get('name'):
+        lines.append(f"Top scorer: {ts['name']} {ts['runs']}({ts['balls']}) SR {ts['sr']}.")
+    bb = data.get('best_bowler', {})
+    if bb.get('name') and bb.get('wkts', 0) > 0:
+        lines.append(f"Best bowling: {bb['name']} {bb['wkts']}/{bb['runs']} ({bb['overs']} Ov, Econ {bb['econ']}).")
+
+    if data.get('partnerships'):
+        lines.append("Top partnerships: " + " | ".join(data['partnerships']) + ".")
+    if data.get('collapses'):
+        lines.append("Collapses: " + " | ".join(data['collapses']) + ".")
+    if data.get('top_bowlers'):
+        lines.append("Bowlers: " + ", ".join(data['top_bowlers']) + ".")
+    if data.get('econ_worst'):
+        lines.append(f"Most expensive: {data['econ_worst']}.")
+    if data.get('extras_breakdown'):
+        lines.append(f"Extras: {data['extras_breakdown']}.")
+
+    prompt = (
+        "You are a cricket commentator signing off an innings. "
+        "Speak in 2 sentences (max 40 words total) summarising the innings "
+        "from a commentator's on-air perspective.\n\n"
+        f"Context: {' '.join(lines)}\n\n"
+        "CRITICAL: Reply with ONLY the commentary. No labels, no meta-text. "
+        "Just the on-air sign-off."
+    )
+    return prompt
+
+
+def _build_match_summary_prompt(data: dict) -> str:
+    """Build a detailed commentator-perspective prompt for the end-of-match summary."""
+    inns1 = data.get('innings1', {})
+    inns2 = data.get('innings2', {})
+    lines = [f"Match result: {data['result']}."]
+    lines.append(
+        f"{data['team1_name']}: {data['team1_score']} ({data['team1_overs']}). "
+        f"{data['team2_name']}: {data['team2_score']} ({data['team2_overs']})."
+    )
+
+    # Key stats from innings 1
+    if inns1.get('top_scorer'):
+        ts = inns1['top_scorer']
+        lines.append(f"Inn1 top scorer: {ts['name']} {ts['runs']}({ts['balls']}).")
+    if inns1.get('best_bowler'):
+        bb = inns1['best_bowler']
+        lines.append(f"Inn1 best bowling: {bb['name']} {bb['wkts']}/{bb['runs']}.")
+
+    # Key stats from innings 2
+    if inns2.get('top_scorer'):
+        ts = inns2['top_scorer']
+        lines.append(f"Inn2 top scorer: {ts['name']} {ts['runs']}({ts['balls']}).")
+    if inns2.get('best_bowler'):
+        bb = inns2['best_bowler']
+        lines.append(f"Inn2 best bowling: {bb['name']} {bb['wkts']}/{bb['runs']}.")
+
+    # Collapses
+    for label, inns in [("Inn1", inns1), ("Inn2", inns2)]:
+        if inns.get('collapses'):
+            lines.append(f"{label} collapse: " + " | ".join(inns['collapses']) + ".")
+
+    potm = data.get('potm_name')
+    if potm:
+        lines.append(f"Player of the match: {potm} ({data.get('potm_runs', 0)} runs, {data.get('potm_wickets', 0)} wkts).")
+
+    prompt = (
+        "You are a cricket commentator signing off a match. "
+        "Speak in 2 sentences (max 40 words total) summing up the match "
+        "from a commentator's on-air perspective.\n\n"
+        f"Context: {' '.join(lines)}\n\n"
+        "CRITICAL: Reply with ONLY the commentary. No labels, no meta-text. "
+        "Just the on-air sign-off."
+    )
+    return prompt
+
+
+_SUMMARY_FALLBACKS = {
+    "over": "End of over {over_number}: {runs} run(s), {wickets} wicket(s). Score: {score}/{total_wickets}.",
+    "innings": "End of innings: {score}/{wickets} in {overs}.",
+    "match": "The match has concluded.",
+}
+
+
+def _fallback_summary(summary_type: str, data: dict) -> str:
+    """Return a fallback summary string, safely handling missing keys."""
+    fb = _SUMMARY_FALLBACKS.get(summary_type, "")
+    if not fb:
+        return fb
+    try:
+        return fb.format(**data)
+    except KeyError:
+        # Safely extract what we can
+        parts = []
+        if summary_type == "over":
+            parts.append(f"End of over {data.get('over_number', '?')}")
+            parts.append(f"{data.get('runs', 0)} run(s)")
+            parts.append(f"{data.get('wickets', 0)} wicket(s)")
+        elif summary_type == "innings":
+            parts.append(f"End of innings: {data.get('score', 0)}/{data.get('wickets', 0)} in {data.get('over_str', '0.0')}")
+        elif summary_type == "match":
+            parts.append(data.get('result', 'Match concluded'))
+        return ". ".join(parts) + "."
+
+
+def generate_summary(summary_type: str, data: dict) -> str | None:
+    """
+    Generate an LLM summary (over / innings / match) from a commentator's POV.
+    Falls back to a minimal template if LLM is unavailable or returns invalid text.
+    """
+    builders = {
+        "over": _build_over_summary_prompt,
+        "innings": _build_innings_summary_prompt,
+        "match": _build_match_summary_prompt,
+    }
+    builder = builders.get(summary_type)
+    if not builder:
+        return None
+
+    prompt = builder(data)
+    llm_text = _query_llm(prompt, timeout=20.0)
+
+    if llm_text and _is_valid_commentary(llm_text):
+        return llm_text.strip()
+
+    # Fallback
+    return _fallback_summary(summary_type, data)
 
 
 def get_active_provider_name() -> str | None:

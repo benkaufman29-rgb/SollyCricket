@@ -217,7 +217,7 @@ def call_openrouter(prompt: str, timeout: float = 10.0) -> str | None:
             "model": model,
             "messages": [{"role": "user", "content": prompt}],
             "temperature": 0.8,
-            "max_tokens": 500,
+            "max_tokens": 1024,
         }
 
         # Retry with exponential backoff for this model
@@ -245,7 +245,7 @@ def call_openrouter(prompt: str, timeout: float = 10.0) -> str | None:
                 choice = data["choices"][0]["message"]
                 text = choice.get("content") or choice.get("reasoning") or ""
                 if text.strip():
-                    return text.strip()[:150]
+                    return text.strip()
                 break  # Empty response isn't a retry-able error
             except requests.RequestException as e:
                 if attempt < 2 and "429" not in str(e):
